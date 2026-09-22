@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NyXia Game | Le jeu</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/jeu.css"></head><body><canvas id="starry-canvas"></canvas><main><header><h1>NyXia Game</h1><small id="counter"></small></header><p id="title">Le jeu</p><h2 id="scene-title">Nom du jeu à venir</h2><section id="media-presentation"><div class="media-heading"><span>Médias du jeu</span><button type="button" id="fullscreen-media" disabled aria-label="Afficher les médias en plein écran">⛶ Plein écran</button></div><div id="media"></div></section><p id="story">Ton aventure apparaîtra ici.</p><div id="breakout"></div><div class="actions"><button id="previous" disabled>← Précédent</button><button id="next" disabled>Suivant →</button></div></main><script src="/js/starry-bg.js" defer></script><script>
+'use strict';
+let scenes=[],slides=[],index=0,resumeIndex=0,gameId='',token=sessionStorage.getItem('nyxia_token')||'';
+const $=id=>document.getElementById(id);
+const resume=document.createElement('button');resume.id='resume';resume.type='button';resume.hidden=true;resume.style.display='none';resume.textContent='↪ Reprendre la partie';
+$('previous').after(resume);
+function validUrl(raw){try{const u=new URL(raw,location.href);return (u.protocol==='https:'&&!u.username&&!u.password)?u:null}catch(_){return null}}
+function driveId(url){if(url.hostname!=='drive.google.com')return '';const m=url.pathname.match(/^\/file\/d\/([\w-]+)/);return m?m[1]:url.pathname==='/open'?url.searchParams.get('id')||'':'';}
+function clearMedia(){const media=$('media');media.querySelectorAll('video,audio').forEach(el=>{try{el.pause();el.removeAttribute('src');el.load()}catch(_){}});media.replaceChildren()}
+function makeSlides(list){
+ const all=[];
+ for(const [sceneIndex,s] of list.entries()){
+  all.push({sceneIndex,scene:s,media:null});
+  const media=s.media||{},items=Array.isArray(media.items)&&media.items.length?media.items:
+    [['imageUrl','image'],['videoUrl','video'],['audioUrl','audio']].filter(x=>media[x[0]]).map(([key,kind],j)=>({id:'legacy-'+j,kind,url:media[key],label:'Média '+kind}));
+  items.filter(it=>['image','video','audio'].includes(it.kind)&&validUrl(it.url))
+    .slice(0,48).forEach(it=>all.push({sceneIndex,scene:s,media:it}));
+ }
+ return all;
+}
+function addExternalMedia(slide){
+ const m=slide.media,u=validUrl(m.url);if(!u)return;
+ const id=driveId(u),box=$('media');
+ if(id){
+  const frame=document.createElement('iframe');frame.src='https://drive.google.com/file/d/'+encodeURIComponent(id)+'/preview';frame.title=m.label||'Aperçu Google Drive';frame.loading='lazy';frame.referrerPolicy='no-referrer';frame.allow='autoplay; fullscreen';frame.style.cssText='width:100%;min-height:350px;border:0';box.appendChild(frame);
+ }else{
+  const el=document.createElement(m.kind==='image'?'img':m.kind);el.src=u.href;
+  if(m.kind==='image'){el.alt=m.label||slide.scene.title||'Image du jeu';el.loading='lazy'}
+  else{el.controls=true;el.preload='metadata';el.loop=m.playback==='boucle';if(m.trigger==='début')el.play().catch(()=>{})}
+  box.appendChild(el);
+ }
+ const link=document.createElement('a');link.href=u.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='↗ Ouvrir le média';link.style.cssText='display:inline-block;margin-top:8px;color:#a78bfa;overflow-wrap:anywhere';box.appendChild(link);
+}
+function render(){
+ const slide=slides[index];if(!slide)return;
+ const s=slide.scene,isIntro=!slide.media;
+ $('scene-title').textContent=s.title||'Scène';$('title').textContent=(s.phase||'')+(isIntro?' · Annonce':' · '+(slide.media.label||slide.media.kind));
+ $('counter').textContent=(index+1)+' / '+slides.length;
+ $('story').textContent=isIntro?[s.readAloud,s.announcement,s.playerObjective].filter(Boolean).join('\n\n')||'Début de cette scène.':(slide.media.trigger==='manuel'?'Lance ce média quand tu es prête.':'Média de la scène.');
+ clearMedia();if(slide.media)addExternalMedia(slide);
+ $('fullscreen-media').disabled=!slide.media;$('breakout').replaceChildren();
+ if(isIntro&&s.breakout?.enabled){const d=document.createElement('div');d.className='breakout';d.textContent='Salles de sous-groupes : '+(s.breakout.instruction||'Suivez les indications du maître de jeu.');$('breakout').appendChild(d)}
+ $('previous').disabled=index===0;$('next').disabled=index>=slides.length-1;
+}
+async function progress(action,at){
+ try{const r=await fetch('/api/game/slides/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action,index:at})});if(!r.ok)return null;return await r.json()}catch(_){return null}
+}
+function go(to){if(to<0||to>=slides.length)return;index=to;render();progress('save',index)}
+$('previous').onclick=()=>go(index-1);$('next').onclick=()=>go(index+1);
+resume.onclick=()=>{resume.hidden=true;resume.style.display='none';go(resumeIndex)};
+$('fullscreen-media').onclick=()=>{const target=$('media-presentation');if(document.fullscreenElement){document.exitFullscreen?.();return}if(target&&$('media').children.length)target.requestFullscreen?.().catch(()=>{})};
+document.addEventListener('fullscreenchange',()=>{$('fullscreen-media').textContent=document.fullscreenElement?'⛶ Quitter le plein écran':'⛶ Plein écran'});
+fetch('/api/game/slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})})
+ .then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'Accès indisponible');return d})
+ .then(async d=>{
+  gameId=d.gameId||'';$('title').textContent=d.title||'Le jeu';scenes=Array.isArray(d.scenes)?d.scenes:[];slides=makeSlides(scenes);
+  if(!slides.length){$('story').textContent='Les scènes de ce jeu ne sont pas encore disponibles.';return}
+  render();const saved=await progress('get');if(Number.isSafeInteger(saved?.index)&&saved.index>0&&saved.index<slides.length){resumeIndex=saved.index;resume.hidden=false;resume.style.display='';resume.textContent='↪ Reprendre à la diapositive '+(resumeIndex+1)}
+ }).catch(err=>{$('story').textContent=err.message});
+</script></body></html>

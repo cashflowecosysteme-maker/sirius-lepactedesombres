@@ -1,0 +1,13 @@
+NyXia Game — Sirius : Le Pacte des Ombres
+
+Sous-domaine : sirius-lepactedesombres.nyxia.top
+Identifiant jeu : ee2eaf9b-4708-4891-8e0d-f1800cdabe76
+
+1. Déployer cette coque dans le dépôt de CE jeu (sans modifier les bindings CASHFLOW_KV et DB).
+2. Dans NyXiaLabo > Compilation ZIP, cliquer « Enregistrer ce jeu dans CASHFLOW_KV ». Ce transfert privé est nécessaire : le ZIP ne contient ni secrets ni cerveaux PNJ en fichiers statiques.
+3. Configurer domaine et vérifier la connexion et les droits acheteur sur ce sous-domaine.
+4. Tester toutes les scènes, tous les lecteurs et le bouton Reprendre.
+
+Les médias restent à leurs URL externes. Le ZIP contient leurs adresses, sans intégrer les fichiers multimédias.
+
+Ne jamais diffuser un ZIP contenant des secrets de maître de jeu.
