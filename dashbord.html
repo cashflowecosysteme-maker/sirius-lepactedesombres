@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" href="/images/FavIcon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NyXia Game | Nom du jeu à venir</title>
+  <title>NyXia Game | Sirius : Le Pacte des Ombres</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +30,7 @@
       <div class="welcome-text">Bienvenue dans NyXia Game ✦ <strong id="header-username"></strong></div>
     </div>
     <div class="header-actions">
-      <span class="btn-header btn-pro">🎲 NyXia Game | Nom du jeu à venir</span>
+      <span class="btn-header btn-pro">🎲 NyXia Game | Sirius : Le Pacte des Ombres</span>
       <button class="btn-header btn-logout" onclick="logout()">Déconnexion</button>
     </div>
   </header>
@@ -65,7 +65,7 @@
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">Le jeu</div>
-        <div class="nav-item" id="nav-jeu" onclick="nxgOpenPanel('jeu')"><span class="nav-icon">🎮</span><span class="nav-text"><span class="nav-name" id="nxg-title-nav">Nom du jeu à venir</span><span class="nav-sub">Diapositives · Médias · Histoire</span></span><span class="nav-arrow">›</span></div>
+        <div class="nav-item" id="nav-jeu" onclick="nxgOpenPanel('jeu')"><span class="nav-icon">🎮</span><span class="nav-text"><span class="nav-name" id="nxg-title-nav">Sirius : Le Pacte des Ombres</span><span class="nav-sub">Diapositives · Médias · Histoire</span></span><span class="nav-arrow">›</span></div>
         <div class="nav-item" id="nav-des" onclick="openAgentTab('des')"><span class="nav-icon">🎲</span><span class="nav-text"><span class="nav-name">Dés 3D NyXia</span><span class="nav-sub">Lancer les dés du jeu</span></span><span class="nav-arrow">›</span></div>
         <div class="nav-item" id="nav-compte" onclick="nxgOpenPanel('compte')"><span class="nav-icon">📊</span><span class="nav-text"><span class="nav-name">Voir mon tableau de bord</span></span><span class="nav-arrow">›</span></div>
         <div class="nav-item" id="nav-carte" onclick="nxgOpenPanel('carte')"><span class="nav-icon">🗺️</span><span class="nav-text"><span class="nav-name">Carte du jeu</span></span><span class="nav-arrow">›</span></div>
@@ -92,7 +92,7 @@
       </div>
 
       <!-- Les pages du jeu sont AJOUTÉES : le panneau original de conversations reste intact. -->
-      <div class="panel nxg-panel" id="panel-jeu" onfullscreenchange="document.getElementById('nxg-fullscreen-game').textContent=document.fullscreenElement?'⛶ Quitter le plein écran':'⛶ Plein écran'"><div class="nxg-toolbar"><button type="button" id="nxg-fullscreen-game" onclick="var p=document.getElementById('panel-jeu');if(document.fullscreenElement){document.exitFullscreen()}else{p.requestFullscreen()}">⛶ Plein écran</button><h2 id="nxg-game-title">Nom du jeu à venir</h2></div><iframe src="about:blank" id="nxg-game-frame" title="Le jeu" allow="autoplay;fullscreen;picture-in-picture" onload="try{var b=this.contentDocument.getElementById('fullscreen-media');if(b)b.hidden=true}catch(e){}"></iframe></div>
+      <div class="panel nxg-panel" id="panel-jeu" onfullscreenchange="document.getElementById('nxg-fullscreen-game').textContent=document.fullscreenElement?'⛶ Quitter le plein écran':'⛶ Plein écran'"><div class="nxg-toolbar"><button type="button" id="nxg-fullscreen-game" onclick="var p=document.getElementById('panel-jeu');if(document.fullscreenElement){document.exitFullscreen()}else{p.requestFullscreen()}">⛶ Plein écran</button><h2 id="nxg-game-title">Sirius : Le Pacte des Ombres</h2></div><iframe src="about:blank" id="nxg-game-frame" title="Le jeu" allow="autoplay;fullscreen;picture-in-picture" onload="try{var b=this.contentDocument.getElementById('fullscreen-media');if(b)b.hidden=true}catch(e){}"></iframe></div>
       <div class="panel nxg-panel nxg-scroll" id="panel-compte"><h2>Mon tableau de bord</h2><div id="nxg-account-content" class="nxg-grid"></div><section class="nxg-license"><h3>Licence d’utilisation</h3><p>Tu peux organiser des activités payantes à partir de ce jeu. Tu ne peux pas revendre le jeu, ses fichiers ou ses licences. Sa recommandation commerciale passe exclusivement par le Cercle d’entraide autorisé.</p></section></div>
       <div class="panel nxg-panel nxg-scroll" id="panel-ressource"><h2 id="nxg-resource-title">Informations du jeu</h2><div class="nxg-resource" id="nxg-resource-body"></div></div>
       <div class="panel nxg-panel nxg-scroll" id="panel-carte"><h2>Carte du jeu</h2><div id="nxg-map-content">La carte apparaîtra avec ce jeu.</div></div>
@@ -342,8 +342,10 @@
         item.tabIndex = 0
         var avatar = document.createElement('img')
         avatar.className = 'nav-avatar'
-        avatar.src = '/images/PNJ-avatar.png'
-        avatar.alt = ''
+        var npcMeta = nxgState && nxgState.game && Array.isArray(nxgState.game.npcs) ? nxgState.game.npcs.find(function(n){ return n.id === opt.value }) : null
+        avatar.src = (npcMeta && /^https:\/\//i.test(String(npcMeta.portraitUrl||''))) ? npcMeta.portraitUrl : '/images/PNJ-avatar.png'
+        avatar.alt = npcMeta ? npcMeta.name : ''
+        avatar.onerror = function(){ this.onerror=null; this.src='/images/PNJ-avatar.png' }
         var text = document.createElement('span')
         text.className = 'nav-text'
         var name = document.createElement('span')

@@ -3009,15 +3009,19 @@ async function gamePublicInfo(env) {
 function gameNpcsFromProduct(p) {
   if (!p) return [];
   const snap = p.runtimeSnapshot || {};
-  let parsed = p.npcs || snap.npcRuntimeJson || [];
+  let parsed = p.npcs || snap.npcRuntimeJson || snap.npcCharacters || [];
   if (typeof parsed === 'string') try { parsed = JSON.parse(parsed); } catch (_) {parsed=[];}
-  const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.npcs) ? parsed.npcs : [];
+  let items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.npcs) ? parsed.npcs : [];
+  if (!items.length && Array.isArray(snap.npcCharacters)) items = snap.npcCharacters;
   const seen = new Set();
   return items.slice(0,60).map((npc,i) => {
     const name = String(npc?.name || npc?.nom || '').trim().slice(0,140);
     const id = String(npc?.id || name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_-]+/g,'-')).replace(/[^a-z0-9_-]/g,'').slice(0,80);
     if (!name || !id || seen.has(id)) return null;
-    seen.add(id); return {id,name,description:String(npc.description||npc.role||'').slice(0,1000),brain:npc};
+    let portraitUrl='';
+    try { const u=new URL(String(npc?.portraitUrl||'')); if(u.protocol==='https:'&&!u.username&&!u.password) portraitUrl=u.href; } catch (_) {}
+    seen.add(id);
+    return {id,name,description:String(npc.description||npc.role||'').slice(0,1000),portraitUrl,brain:npc};
   }).filter(Boolean);
 }
 async function gameFindNpc(env,id) { const p = await gameProduct(env);return gameNpcsFromProduct(p).find(n=>n.id===id)||null; }
@@ -3145,6 +3149,45 @@ async function gameMjKnowledgeContext(env, product, question) {
   }
   return out.join('\n\n').slice(0,16000);
 }
+// NYXIA_GAME_NPC_SCOPED_BRAIN_V1 — chaque PNJ lit uniquement CE jeu et CE personnage.
+async function gameNpcKnowledgeContext(env, product, npc, question) {
+  const source=String(product?.sourceProjectId||'');
+  const characterId=String(npc?.id||'');
+  const brain=npc?.brain||{};
+  if(!/^[a-zA-Z0-9_-]{1,120}$/.test(source)||!/^[a-z0-9_-]{1,80}$/.test(characterId))throw Error('Jeu ou personnage non identifié pour son cerveau.');
+  const trust=Number(brain.trust??0);
+  const docs=(Array.isArray(brain.knowledgeDocs)?brain.knowledgeDocs:[]).filter(d=>Number.isFinite(trust)&&trust>=Number(d?.minimumTrust??0));
+  if(!docs.length)return '';
+  if(!env.CASHFLOW_KV||!env.VECTORIZE_INDEX||typeof env.VECTORIZE_INDEX.describe!=='function')throw Error('KV ou Vectorize commun non configurés pour ce personnage.');
+  const details=await env.VECTORIZE_INDEX.describe(),dims=Number(details.dimensions||details.config?.dimensions);
+  let model,vector; const input=String(question||'').slice(0,2500).trim()||'Situation actuelle du jeu';
+  if((dims===1024||dims===768)&&env.AI&&typeof env.AI.run==='function'){
+    model=dims===1024?'@cf/baai/bge-m3':'@cf/baai/bge-base-en-v1.5';
+    const output=await env.AI.run(model,{text:[input]}); vector=output?.data?.[0];
+  }else if(dims>=256&&dims<=1536&&(env.OPENAI_API_KEY||env.OpenAi_KEY)){
+    model='text-embedding-3-small'; const key=env.OPENAI_API_KEY||env.OpenAi_KEY;
+    const response=await fetch('https://api.openai.com/v1/embeddings',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model,input:[input],dimensions:dims})});
+    if(!response.ok)throw Error('Vectorisation de la question du personnage indisponible.');
+    const payload=await response.json(); vector=payload.data?.[0]?.embedding;
+  }else throw Error('Modèle de vectorisation non configuré pour ce cerveau.');
+  if(!Array.isArray(vector)||vector.length!==dims)throw Error('Vecteur de question incompatible.');
+  const eligible=docs.filter(d=>/^[a-zA-Z0-9_-]{1,120}$/.test(String(d?.id||''))&&(!d.model||d.model===model));
+  if(!eligible.length)throw Error('Les documents de ce personnage utilisent un autre modèle de vectorisation.');
+  const hex=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(source+'\u0000'+characterId)))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const namespace='nyxia-game-'+hex.slice(0,53),result=await env.VECTORIZE_INDEX.query(vector,{namespace,topK:6,returnMetadata:'all'});
+  const approved=new Set(eligible.map(d=>String(d.id))),cached=new Map(),out=[],seen=new Set();
+  for(const hit of result.matches||[]){
+    const md=hit.metadata||{},docId=String(md.docId||''),part=md.part;
+    if(md.gameId!==source||md.characterId!==characterId||!approved.has(docId)||!Number.isInteger(part)||part<0)continue;
+    const k=docId+':'+part;if(seen.has(k))continue;
+    let entry=cached.get(docId); if(entry===undefined){entry=await env.CASHFLOW_KV.get('game:npc-brain:'+source+':'+characterId+':'+docId,'json');cached.set(docId,entry||null)}
+    if(!entry||entry.gameId!==source||entry.characterId!==characterId||!Array.isArray(entry.chunks)||typeof entry.chunks[part]!=='string')continue;
+    seen.add(k); out.push('SOURCE DU CERVEAU « '+String(entry.title||'Connaissances').slice(0,160)+' » :\n'+entry.chunks[part]);
+    if(out.join('\n\n').length>7000)break;
+  }
+  return out.join('\n\n').slice(0,7600);
+}
+
 function gameChatContext(agent,p) {
   if (!p) return '\n\nAucun jeu compilé : ne prétends pas connaître une aventure.';
   const core = '\n\nJEU UNIQUE : '+String(p.title||'')+' (id '+String(p.id||'')+'). Aucune référence à une autre aventure.';
@@ -3987,16 +4030,16 @@ async function handleChat(request, env) {
     }catch(err){console.error('NYXIA_MJ_BRAIN',{code:'BOOK_RETRIEVAL_UNAVAILABLE',type:err?.name||'Error'});return json({error:'Le livre MJ de ce jeu est inaccessible : '+err.message},503);}
   }
 
-  if(agent!=='nyxia')systemPrompt += `\n\nPHILOSOPHIE COMMUNE DE L'UNIVERS NYXIA (rappel) : entraide, relation humaine, pas MLM, pas paliers et pas de vente dure. Chacun gagne à aider les autres à réussir. Incarne ton personnage avec cohérence. Si la personne te demande ce que tu es, respecte la réponse transparente prévue dans ta personnalité.`;
+  if(!npcInfo&&agent!=='nyxia')systemPrompt += `\n\nPHILOSOPHIE COMMUNE DE L'UNIVERS NYXIA (rappel) : entraide, relation humaine, pas MLM, pas paliers et pas de vente dure. Chacun gagne à aider les autres à réussir. Incarne ton personnage avec cohérence. Si la personne te demande ce que tu es, respecte la réponse transparente prévue dans ta personnalité.`;
   systemPrompt += `\n\nCADRE DE SÉCURITÉ COMMUN : tu demeures une assistante de création, jamais une partenaire romantique de la personne. Aucun jeu de rôle amoureux immersif avec l'utilisateur, aucun contenu sexuel explicite, aucune sexualisation de mineur, aucune description graphique de violence et aucune description ou mise en scène de suicide ou d'automutilation. Pour un sujet sensible, reste sobre, non graphique et recentre sur la structure, l'émotion générale ou une solution narrative sûre.`;
-  if(agent!=='nyxia')systemPrompt += IMAGE_GENERATION_INSTRUCTIONS;
+  if(!npcInfo&&agent!=='nyxia')systemPrompt += IMAGE_GENERATION_INSTRUCTIONS;
   if (agent === 'eric') systemPrompt += TERMINOLOGIE_OFFICIELLE;
-  if(agent!=='nyxia')systemPrompt += PEDAGOGIE_FORMATEUR;
+  if(!npcInfo&&agent!=='nyxia')systemPrompt += PEDAGOGIE_FORMATEUR;
   // Les consignes d'un autre portail ne sont pas injectées dans NyXia MJ.
-  if(agent!=='nyxia')systemPrompt += PROMPT_MARKER_INSTRUCTIONS;
+  if(!npcInfo&&agent!=='nyxia')systemPrompt += PROMPT_MARKER_INSTRUCTIONS;
 
   // Injecte la vraie banque de prompts de l'agent actif, si elle existe dans le KV.
-  const bankRaw = agent==='nyxia'?null:await env.CASHFLOW_KV.get(`prompts:${portalSlug(env)}:${agent}`);
+  const bankRaw = (agent==='nyxia'||npcInfo)?null:await env.CASHFLOW_KV.get(`prompts:${portalSlug(env)}:${agent}`);
   if (bankRaw) {
     systemPrompt += `\n\n✍️ RESSOURCES D'ÉCRITURE DU PERSONNAGE ACTIF\n\nVoici une banque approuvée de consignes, exercices, structures ou modèles reliés à ta spécialité. Utilise seulement les éléments réellement présents ci-dessous. Choisis la ressource la plus pertinente pour la demande actuelle, respecte son intention et adapte-la au projet sans remplacer la voix de l'auteur. Si aucune ressource ne correspond, dis-le honnêtement et poursuis avec ta méthode générale. Ne prétends jamais avoir consulté un élément absent.\n\n${bankRaw}`;
   }
@@ -4021,6 +4064,13 @@ async function handleChat(request, env) {
     approvedLivingVideoUrls = available.VIDEO;
     approvedLivingAudioUrls = available.AUDIO;
     approvedNpcPdfUrls = available.PDF;
+    try {
+      const brainCtx=await gameNpcKnowledgeContext(env,productForChat,npcInfo,message||'');
+      if(brainCtx)systemPrompt += `\n\n🧠 CERVEAU VECTORIEL DE ${npcInfo.name.toUpperCase()} — extraits autorisés pour CE jeu et CE personnage uniquement :\n${brainCtx}`;
+    } catch(err) {
+      console.error('NYXIA_GAME_NPC_BRAIN',{npc:npcInfo.id,code:'BRAIN_RETRIEVAL_UNAVAILABLE',type:err?.name||'Error'});
+      if(Array.isArray(npcInfo.brain?.knowledgeDocs)&&npcInfo.brain.knowledgeDocs.length)return json({error:'Le cerveau de '+npcInfo.name+' est inaccessible : '+err.message},503);
+    }
     systemPrompt += `\n\nSi tu souhaites remettre un objet, demande uniquement [GIVE_ITEM: identifiant]. Ne révèle aucune URL avant confirmation du Worker. Catalogue contrôlé par le moteur du jeu.`;
   }
   let videoProtocolAdded = false;
@@ -4188,7 +4238,10 @@ async function handleChat(request, env) {
   }
 
   let resp=null,usedModel=OPENROUTER_MODEL;
-  for(const model of [OPENROUTER_MODEL,OPENROUTER_FALLBACK_MODEL]){
+  const npcModel=npcInfo?String(npcInfo.brain?.openRouterModel||'').trim():'';
+  if(npcInfo&&!/^[a-zA-Z0-9._:/-]{3,180}$/.test(npcModel))return json({error:'Modèle OpenRouter non configuré pour '+npcInfo.name+'.'},503);
+  const modelChain=npcInfo?[npcModel]:[OPENROUTER_MODEL,OPENROUTER_FALLBACK_MODEL];
+  for(const model of modelChain){
     try{
       const candidate=await callModel(model);
       if(candidate?.ok){resp=candidate;usedModel=model;break;}
@@ -5460,18 +5513,21 @@ async function handleTTSNyxia(request, env) {
   const gameAuth = await gameCaller(request,env,{token});
   if (!gameAuth?.allowed) return json({error:'Ce jeu n’est pas accessible sur ce compte.'},403);
   if (!text) return json({ error: 'Texte requis.' }, 400);
-  if (agent.startsWith('pnj:')) return json({ error: 'Voix du personnage non configurée.' }, 404);
+  const ttsNpc = /^pnj:[a-z0-9_-]{1,80}$/.test(agent) ? await gameFindNpc(env,agent.slice(4)) : null;
+  if(agent.startsWith('pnj:')&&!ttsNpc)return json({error:'Personnage introuvable dans ce jeu.'},404);
 
   // Nettoyage défensif : retire tout caractère Unicode "brisé" (moitié d'emoji orpheline)
   const sanitized = text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
   const cleanText = Array.from(sanitized).slice(0, 4500).join('');
 
   // ── Voie 0 : ElevenLabs (priorité absolue si configuré — normalement NyXia) ──
-  const elevenLabsVoiceIdKey = AGENT_ELEVENLABS_VOICE_ID_KEYS[agent];
-  const elevenLabsVoiceId = (elevenLabsVoiceIdKey ? env[elevenLabsVoiceIdKey] : null) || ELEVENLABS_VOICE_ID_DEFAULTS[agent] || null;
+  const elevenLabsVoiceIdKey = ttsNpc ? null : AGENT_ELEVENLABS_VOICE_ID_KEYS[agent];
+  const elevenLabsVoiceId = ttsNpc ? String(ttsNpc.brain?.elevenLabsVoiceId||'').trim() : ((elevenLabsVoiceIdKey ? env[elevenLabsVoiceIdKey] : null) || ELEVENLABS_VOICE_ID_DEFAULTS[agent] || null);
+  if(ttsNpc&&!/^[a-zA-Z0-9_-]{6,120}$/.test(elevenLabsVoiceId))return json({error:'ID de voix ElevenLabs non configuré pour '+ttsNpc.name+'.'},404);
 
   if (elevenLabsVoiceId) {
-    const cacheKey = 'tts_cache_elevenlabs:' + agent + ':' + (await sha256Hex(cleanText));
+    const cacheAgent=ttsNpc?('game:'+gameId(env)+':pnj:'+ttsNpc.id):agent;
+    const cacheKey = 'tts_cache_elevenlabs:' + cacheAgent + ':' + (await sha256Hex(cleanText));
     const cachedBuf = await env.CASHFLOW_KV.get(cacheKey, 'arrayBuffer');
     if (cachedBuf) {
       return json({
@@ -5506,6 +5562,8 @@ async function handleTTSNyxia(request, env) {
       });
     }
   }
+
+  if(ttsNpc)return json({error:'La voix ElevenLabs de '+ttsNpc.name+' est momentanément indisponible.'},502);
 
   const voiceIdKey = AGENT_VOICE_ID_KEYS[agent];
   const heygenVoiceId = voiceIdKey ? env[voiceIdKey] : null;

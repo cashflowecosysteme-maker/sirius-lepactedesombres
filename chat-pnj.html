@@ -162,12 +162,29 @@
     el.innerHTML = '<img src="' + (AGENT_IMAGES[key] || AGENT_IMAGES.pnj) + '" alt="' + ((ALPHA_INFO[key] && ALPHA_INFO[key].name) || 'PNJ') + '">'
   }
 
-  function init() {
+  async function loadNpcIdentity() {
+    if (!_npcId || !sessionToken) return
+    try {
+      var r = await fetch('/api/game/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token:sessionToken}) })
+      var data = await r.json()
+      if (!r.ok || !data || !data.game || !Array.isArray(data.game.npcs)) return
+      var npc = data.game.npcs.find(function(n){ return n && n.id === _npcId })
+      if (!npc) return
+      ALPHA_INFO.pnj.name = npc.name || ALPHA_INFO.pnj.name
+      ALPHA_INFO.pnj.sub = npc.description || 'Personnage du jeu'
+      ALPHA_INFO.pnj.greeting = 'Bonjour, je suis ' + ALPHA_INFO.pnj.name + '.'
+      if (/^https:\/\//i.test(String(npc.portraitUrl||''))) AGENT_IMAGES.pnj = npc.portraitUrl
+    } catch (e) {}
+  }
+
+  async function init() {
+    await loadNpcIdentity()
     loadChatFromStorage()
-    document.getElementById('chat-header-name').textContent = new URLSearchParams(location.search).get('name') || ALPHA_INFO.pnj.name
+    document.getElementById('chat-header-name').textContent = ALPHA_INFO.pnj.name
     document.getElementById('chat-header-sub').textContent = ALPHA_INFO.pnj.sub
+    document.getElementById('chat-input').placeholder = 'Écris ou parle à ' + ALPHA_INFO.pnj.name + '...'
     updateHeaderAvatar('pnj')
-    document.title = 'PNJ — NyXia'
+    document.title = ALPHA_INFO.pnj.name + ' — NyXia Game'
 
     renderStoredMessages()
     var videoUrl = AGENT_WELCOME_VIDEO.pnj
@@ -569,7 +586,7 @@
     if (btn._nxSpeaking) { window.speechSynthesis && window.speechSynthesis.cancel(); stopSpeakBtn(btn); return }
     window.speechSynthesis && window.speechSynthesis.cancel()
     document.querySelectorAll('.msg button').forEach(function(b) { if (b._nxSpeaking) stopSpeakBtn(b) })
-    speakViaServer(btn, text, _currentAgent)
+    speakViaServer(btn, text, _npcId ? ('pnj:' + _npcId) : _currentAgent)
   }
 
   function speakViaServer(btn, text, agentKey) {

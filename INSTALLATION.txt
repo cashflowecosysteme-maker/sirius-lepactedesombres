@@ -4,7 +4,7 @@ Sous-domaine : sirius-lepactedesombres.nyxia.top
 Identifiant jeu : ee2eaf9b-4708-4891-8e0d-f1800cdabe76
 
 1. Déployer cette coque dans le dépôt de CE jeu (sans modifier les bindings CASHFLOW_KV et DB).
-2. Dans NyXiaLabo > Compilation ZIP, cliquer « Enregistrer ce jeu dans CASHFLOW_KV ». Ce transfert privé est nécessaire : le ZIP ne contient ni secrets ni cerveaux PNJ en fichiers statiques.
+2. La compilation a déjà enregistré la configuration privée de CE jeu dans CASHFLOW_KV; aucun deuxième bouton n’est nécessaire pour la première mise en ligne.
 3. Configurer domaine et vérifier la connexion et les droits acheteur sur ce sous-domaine.
 4. Tester toutes les scènes, tous les lecteurs et le bouton Reprendre.
 
