@@ -812,8 +812,10 @@
 
   function cleanForSpeech(str) {
     return str
-      .replace(/\*\*(.*?)\*\*/g, '$1')
-      .replace(/\*(.*?)\*/g, '$1')
+      // Les PNJ gardent leurs actions/didascalies à l'écran entre *...*,
+      // mais ElevenLabs ne lit que ce qui est réellement prononcé.
+      .replace(/(^|[^*])\*(?!\*)([\s\S]*?)\*(?!\*)/g, '$1')
+      .replace(/\*\*([\s\S]*?)\*\*/g, '$1')
       .replace(/---+/g, '')
       .replace(/#{1,6}\s+/g, '')
       .replace(/^>+\s*/gm, '')

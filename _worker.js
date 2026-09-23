@@ -3063,7 +3063,7 @@ function gameNpcPrompt(npc) {
   // URLs, inventaires et anciennes notes ne sont jamais transmis à l'IA.
   const {items,deliverables,knowledgeDocs,...personality}=npc.brain||{};
   const catalog=(Array.isArray(items)?items:[]).map(x=>({id:x.id,title:x.title,kind:x.kind,description:x.description||''}));
-  return `Tu interprètes exclusivement le PNJ fictif ${npc.name} dans CE jeu pour le MJ. Ne confonds jamais ton histoire avec un autre jeu. Utilise uniquement la fiche de personnage et les scènes fournies. Ne prétends JAMAIS avoir remis un objet ou un lien. Tu peux proposer une remise par le seul marqueur [GIVE_ITEM: identifiant] à partir du catalogue; le Worker vérifie ensuite les conditions et est le SEUL à fournir l'URL. Ne fabrique aucune URL. FICHE DU PNJ : ${JSON.stringify(personality).slice(0,11000)}. CATALOGUE DES OBJETS (sans URL) : ${JSON.stringify(catalog).slice(0,4000)}`;
+  return `Tu interprètes exclusivement le PNJ fictif ${npc.name} dans CE jeu pour le MJ. Ne confonds jamais ton histoire avec un autre jeu. Utilise uniquement la fiche de personnage et les scènes fournies. FORMAT VOIX : tu peux rendre le personnage vivant avec des actions, gestes, expressions, ambiance ou didascalies visibles à l'écran, mais TOUT ce qui n'est PAS prononcé à voix haute doit être placé entre UN SEUL astérisque ouvrant et UN SEUL astérisque fermant, par exemple *Ryo sourit et croise les bras.*. Tout dialogue réellement prononcé doit rester hors de ces astérisques. N'utilise JAMAIS les astérisques simples pour mettre un mot prononcé en emphase; si une emphase visuelle est indispensable, utilise le gras **comme ceci**. Ne prétends JAMAIS avoir remis un objet ou un lien. Tu peux proposer une remise par le seul marqueur [GIVE_ITEM: identifiant] à partir du catalogue; le Worker vérifie ensuite les conditions et est le SEUL à fournir l'URL. Ne fabrique aucune URL. FICHE DU PNJ : ${JSON.stringify(personality).slice(0,11000)}. CATALOGUE DES OBJETS (sans URL) : ${JSON.stringify(catalog).slice(0,4000)}`;
 }
 // Remise effective : vérifications sur les données du jeu compilé, la session et la KV centrale.
 async function gameNpcGrantItem(env,product,npc,email,itemId){
@@ -3079,7 +3079,8 @@ async function gameNpcGrantItem(env,product,npc,email,itemId){
   if(item.requiredScene){
     const progress=await env.CASHFLOW_KV.get('nyxia-game:slides:'+id+':'+String(email).toLowerCase(),'json');
     const pos=Number.isSafeInteger(progress?.index)?progress.index:0;
-    const current=String((product.guidedScenes||[])[pos]?.id||'');
+    let first=0,current='';
+    for(const scene of product.guidedScenes||[]){const count=1+(Array.isArray(scene.media?.items)?scene.media.items.length:0);if(pos<first+count){current=String(scene.id||'');break}first+=count}
     if(current!==String(item.requiredScene))return {error:'La scène requise n’est pas active.'};
   }
   // Aucun événement ne peut être déduit d'un texte rédigé par l'IA ou le joueur.
@@ -3248,7 +3249,7 @@ async function gameSlidesProgress(request,env){
  }
  if(!Number.isSafeInteger(body.index)||body.index<0||body.index>15000)return json({error:'Position invalide.'},400);
  const product=await gameProduct(env);if(!product)return json({error:'Jeu introuvable.'},404);
- const max=(product.guidedScenes||[]).length;
+ const max=(product.guidedScenes||[]).reduce((n,scene)=>n+1+(Array.isArray(scene?.media?.items)?scene.media.items.length:0),0);
  if(body.index>=max)return json({error:'Position hors du jeu.'},400);
  const updatedAt=new Date().toISOString();
  await env.CASHFLOW_KV.put(key,JSON.stringify({index:body.index,updatedAt}),{expirationTtl:60*60*24*90});
