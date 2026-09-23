@@ -3079,8 +3079,7 @@ async function gameNpcGrantItem(env,product,npc,email,itemId){
   if(item.requiredScene){
     const progress=await env.CASHFLOW_KV.get('nyxia-game:slides:'+id+':'+String(email).toLowerCase(),'json');
     const pos=Number.isSafeInteger(progress?.index)?progress.index:0;
-    let first=0,current='';
-    for(const scene of product.guidedScenes||[]){const count=1+(Array.isArray(scene.media?.items)?scene.media.items.length:0);if(pos<first+count){current=String(scene.id||'');break}first+=count}
+    const current=String((product.guidedScenes||[])[pos]?.id||'');
     if(current!==String(item.requiredScene))return {error:'La scène requise n’est pas active.'};
   }
   // Aucun événement ne peut être déduit d'un texte rédigé par l'IA ou le joueur.
@@ -3249,7 +3248,7 @@ async function gameSlidesProgress(request,env){
  }
  if(!Number.isSafeInteger(body.index)||body.index<0||body.index>15000)return json({error:'Position invalide.'},400);
  const product=await gameProduct(env);if(!product)return json({error:'Jeu introuvable.'},404);
- const max=(product.guidedScenes||[]).reduce((n,scene)=>n+1+(Array.isArray(scene?.media?.items)?scene.media.items.length:0),0);
+ const max=(product.guidedScenes||[]).length;
  if(body.index>=max)return json({error:'Position hors du jeu.'},400);
  const updatedAt=new Date().toISOString();
  await env.CASHFLOW_KV.put(key,JSON.stringify({index:body.index,updatedAt}),{expirationTtl:60*60*24*90});
