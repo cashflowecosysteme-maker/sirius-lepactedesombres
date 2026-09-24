@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NyXia Game | Le jeu</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/jeu.css"></head><body><canvas id="starry-canvas"></canvas><main><p id="title" hidden></p><h2 id="scene-title" hidden></h2><section id="media-presentation"><div class="media-heading"><span>Médias du jeu</span><button type="button" id="fullscreen-media" disabled aria-label="Afficher les médias en plein écran">⛶ Plein écran</button></div><div id="media"></div></section><div id="slide-status" aria-label="Progression dans le jeu"><span>NyXia Game</span><small id="counter"></small></div><p id="story" hidden></p><div id="breakout"></div><div class="actions"><button id="previous" disabled>← Précédent</button><button id="next" disabled>Suivant →</button></div></main><script src="/js/starry-bg.js" defer></script><script>
+<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NyXia Game | Le jeu</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/jeu.css"></head><body><canvas id="starry-canvas"></canvas><main><p id="title" hidden></p><h2 id="scene-title" hidden></h2><section id="media-presentation"><div class="media-heading"><button type="button" id="fullscreen-media" disabled aria-label="Afficher les médias en plein écran">⛶ Plein écran</button></div><div id="media"></div></section><div id="slide-status" aria-label="Progression dans le jeu"><span>NyXia Game</span><small id="counter"></small></div><p id="story" hidden></p><div id="breakout"></div><div class="actions"><button id="previous" disabled>← Précédent</button><button id="next" disabled>Suivant →</button></div></main><script src="/js/starry-bg.js" defer></script><script>
 'use strict';
 let scenes=[],slides=[],index=0,resumeIndex=0,gameId='',token=sessionStorage.getItem('nyxia_token')||'';
 const $=id=>document.getElementById(id);
@@ -10,8 +10,8 @@ function clearMedia(){const media=$('media');media.querySelectorAll('video,audio
 function sceneMediaItems(s){
  const media=s.media||{};
  const items=Array.isArray(media.items)&&media.items.length?media.items:
-  [['imageUrl','image'],['videoUrl','video'],['audioUrl','audio']].filter(x=>media[x[0]]).map(([key,kind],j)=>({id:'legacy-'+j,kind,url:media[key],label:''}));
- return items.filter(it=>['image','video','audio'].includes(it.kind)&&validUrl(it.url)).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0)).slice(0,48);
+  [['imageUrl','image'],['audioUrl','audio'],['videoUrl','video']].filter(x=>media[x[0]]).map(([key,kind],j)=>({id:'legacy-'+j,kind,url:media[key],label:''}));
+ return items.filter(it=>['image','video','audio'].includes(it.kind)&&validUrl(it.url)).slice(0,48);
 }
 function makeSlides(list){
  return list.map((s,sceneIndex)=>({sceneIndex,scene:s,mediaItems:sceneMediaItems(s)}));
