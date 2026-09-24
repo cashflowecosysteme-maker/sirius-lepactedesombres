@@ -7,17 +7,9 @@
       "title": "Scène 1",
       "media": [
         {
-          "id": "m-wbfgtzdh",
+          "id": "m-c3dxdxbm",
           "kind": "video",
-          "url": "https://www.canva.com/design/DAHWHjT3UVk/YssaCqpWMTLjGVY4y2CNhA/view",
-          "label": "Présentation Canva / Prologue",
-          "trigger": "début",
-          "playback": "complet"
-        },
-        {
-          "id": "m-n6dvzoll",
-          "kind": "video",
-          "url": "https://www.youtube.com/watch?v=EHU6MmBttWo",
+          "url": "https://d1yei2z3i6k35z.cloudfront.net/1872133/6ab58d954ee850.71352697_Prologue_Video_SiriusLePactedelombre.mp4",
           "label": "🎥 Vidéo",
           "trigger": "début",
           "playback": "complet"
