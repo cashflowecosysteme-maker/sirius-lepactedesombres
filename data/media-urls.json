@@ -7,18 +7,18 @@
       "title": "Scène 1",
       "media": [
         {
-          "id": "m-s1mqny23",
-          "kind": "audio",
-          "url": "https://d1yei2z3i6k35z.cloudfront.net/1872133/6ab43d3cd67b36.36435073_LePactedesOmbres-sountrack1.mp3",
-          "label": "🎵 Le Pacte des Ombres - sountrack 1",
-          "trigger": "début",
-          "playback": "complet"
-        },
-        {
           "id": "m-1d22mxcf",
           "kind": "image",
           "url": "https://d1yei2z3i6k35z.cloudfront.net/1872133/6ab43e18855534.25452394_20260917-a7f1aeac035a55f4b6000bddd678fbb3.png",
           "label": "🖼️ Image",
+          "trigger": "début",
+          "playback": "complet"
+        },
+        {
+          "id": "m-s1mqny23",
+          "kind": "audio",
+          "url": "https://d1yei2z3i6k35z.cloudfront.net/1872133/6ab43d3cd67b36.36435073_LePactedesOmbres-sountrack1.mp3",
+          "label": "🎵 Le Pacte des Ombres - sountrack 1",
           "trigger": "début",
           "playback": "complet"
         }
