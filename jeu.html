@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NyXia Game | Le jeu</title><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/jeu.css"></head><body><canvas id="starry-canvas"></canvas><main><p id="title" hidden></p><h2 id="scene-title" hidden></h2><section id="media-presentation"><div class="media-heading"><button type="button" id="fullscreen-media" disabled aria-label="Afficher les médias en plein écran">⛶ Plein écran</button></div><div id="media"></div></section><div id="slide-status" aria-label="Progression dans le jeu"><span>NyXia Game</span><small id="counter"></small></div><p id="story" hidden></p><div id="breakout"></div><div class="actions"><button id="previous" disabled>← Précédent</button><button id="next" disabled>Suivant →</button></div></main><script src="/js/starry-bg.js" defer></script><script>
 'use strict';
-/* NYXIA_GAME_EMBEDS_V1 — YouTube, Canva et Google Drive */
+/* NYXIA_GAME_EMBEDS_V2 — YouTube, Présentation Canva native et Google Drive */
 let scenes=[],slides=[],index=0,resumeIndex=0,gameId='',token=sessionStorage.getItem('nyxia_token')||'';
 const $=id=>document.getElementById(id);
 const resume=document.createElement('button');resume.id='resume';resume.type='button';resume.hidden=true;resume.style.display='none';resume.textContent='↪ Reprendre la partie';
@@ -22,13 +22,11 @@ function youtubeId(url){
 }
 function canvaEmbedUrl(url){
  const host=url.hostname.replace(/^www\./,'').toLowerCase();
- if(host!=='canva.com'||!/^\/design\//.test(url.pathname))return '';
+ if(host==='canva.link')return url.href;
+ if(host!=='canva.com'||!/^\/design\//i.test(url.pathname))return '';
  const u=new URL(url.href);u.hash='';
- if(!/\/view\/?$/i.test(u.pathname)){
-  const parts=u.pathname.split('/').filter(Boolean);
-  const designAt=parts.indexOf('design');
-  if(designAt>=0&&parts[designAt+1])u.pathname='/design/'+parts[designAt+1]+'/view';
- }
+ if(/\/(edit|view)\/?$/i.test(u.pathname))u.pathname=u.pathname.replace(/\/(edit|view)\/?$/i,'/view');
+ else u.pathname=u.pathname.replace(/\/$/,'')+'/view';
  u.searchParams.set('embed','1');
  return u.href;
 }
@@ -42,7 +40,7 @@ function sceneMediaItems(s){
  const media=s.media||{};
  const items=Array.isArray(media.items)&&media.items.length?media.items:
   [['imageUrl','image'],['audioUrl','audio'],['videoUrl','video']].filter(x=>media[x[0]]).map(([key,kind],j)=>({id:'legacy-'+j,kind,url:media[key],label:''}));
- return items.filter(it=>['image','video','audio'].includes(it.kind)&&validUrl(it.url)).slice(0,48);
+ return items.filter(it=>['image','video','audio','presentation'].includes(it.kind)&&validUrl(it.url)).slice(0,48);
 }
 function makeSlides(list){
  return list.map((s,sceneIndex)=>({sceneIndex,scene:s,mediaItems:sceneMediaItems(s)}));
@@ -57,7 +55,7 @@ function addExternalMedia(item,scene){
   box.appendChild(mediaFrame('https://www.youtube-nocookie.com/embed/'+encodeURIComponent(yt)+'?rel=0',item.label||scene.title||'Vidéo YouTube','min(56vw,560px)','autoplay; encrypted-media; picture-in-picture; fullscreen'));
   return;
  }
- if(item.kind==='video'&&canva){
+ if((item.kind==='presentation'||item.kind==='video')&&canva){
   box.appendChild(mediaFrame(canva,item.label||scene.title||'Présentation Canva','min(62vw,640px)','autoplay; fullscreen'));
   return;
  }
